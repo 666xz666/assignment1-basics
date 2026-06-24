@@ -1,13 +1,11 @@
 import os
 import pathlib
-import regex as re
 from collections import Counter, defaultdict
-from typing import BinaryIO, Any
+from typing import BinaryIO
 import multiprocessing
 import ahocorasick
 
-from cs336_basics.bpe_tokenizer.constants import GPT2_PRETOKEN_PATTERN
-
+from cs336_basics.bpe_tokenizer.utils import pre_tokenize
 
 def find_chunk_boundaries(
     file: BinaryIO,
@@ -67,11 +65,9 @@ def find_chunk_boundaries(
 
     return sorted(set(chunk_boundaries))
 
-
-def process_chunk(args) -> Counter[tuple[bytes, ...]]:
+def process_chunk(args) -> Counter[tuple[int, ...]]:
     """
     单进程处理文件分片，GPT2预分词 + 特殊token隔离，返回词频
-    NOTE: 实际内部生成 tuple[int,...]，上层 _count_corpus 做类型适配
     args: (input_path: Path, start: int, end: int, special_tokens: list[str])
     """
     input_path, start, end, special_tokens = args
@@ -83,25 +79,14 @@ def process_chunk(args) -> Counter[tuple[bytes, ...]]:
 
     chunk = raw_data.decode("utf-8", errors="ignore")
 
-    if not special_tokens:
-        for match in re.finditer(GPT2_PRETOKEN_PATTERN, chunk):
-            word_str = match.group(0)
-            token_tuple = tuple(word_str.encode("utf-8", errors="ignore"))
-            word_counter[token_tuple] += 1
-        return word_counter
+    # 直接调用全局预分词函数，不再重复实现分词逻辑
+    token_str_list = pre_tokenize(chunk, special_tokens=special_tokens)
 
-    sorted_special = sorted(special_tokens, key=len, reverse=True)
-    special_pat = "(" + "|".join(re.escape(t) for t in sorted_special) + ")"
-    for part in re.split(special_pat, chunk):
-        if part in special_tokens:
-            word_counter[tuple(part.encode('utf-8', errors="ignore"))] += 1
-        else:
-            for match in re.finditer(GPT2_PRETOKEN_PATTERN, part):
-                word_str = match.group(0)
-                token_tuple = tuple(word_str.encode("utf-8", errors="ignore"))
-                word_counter[token_tuple] += 1
+    for word_str in token_str_list:
+        token_tuple = tuple(word_str.encode("utf-8", errors="ignore"))
+        word_counter[token_tuple] += 1
+
     return word_counter
-
 
 class BPETrainer:
     def __init__(
@@ -293,9 +278,9 @@ class BPETrainer:
 
     def train(self) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
         """主训练入口，迭代合并直到词表达到目标大小"""
-        import cProfile, pstats
-        profiler = cProfile.Profile()
-        profiler.enable()
+        # import cProfile, pstats
+        # profiler = cProfile.Profile()
+        # profiler.enable() # 开始分析
 
         # 初始化流程（仅此处全局统计一次pair）
         self._init_vocab_mappings()
@@ -308,8 +293,8 @@ class BPETrainer:
             if not success:
                 break
 
-        profiler.disable()
-        stats = pstats.Stats(profiler).sort_stats('cumulative')
-        stats.print_stats(15)
+        # profiler.disable() # 结束分析
+        # stats = pstats.Stats(profiler).sort_stats('cumulative')
+        # stats.print_stats(15) # 打印最耗时的15个函数
 
         return self.vocab, self.merges

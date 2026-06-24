@@ -1,7 +1,7 @@
-import regex as re
+from __future__ import annotations
+from typing import Iterator, Iterable
 
-
-from cs336_basics.bpe_tokenizer.constants import GPT2_PRETOKEN_PATTERN
+from cs336_basics.bpe_tokenizer.utils import pre_tokenize
 
 class BPETokenizer:
     def __init__(
@@ -10,83 +10,73 @@ class BPETokenizer:
         merges: list[tuple[bytes, bytes]],
         special_tokens: list[str] | None = None
     ):
+        """
+        GPT2 风格 BPE 分词器，对齐 tiktoken 行为
+        :param vocab: id -> bytes 词表
+        :param merges: 有序合并规则列表 [(a,b), ...]
+        :param special_tokens: 特殊字符串列表
+        """
+        # 正向词表 id → bytes
         self.vocab: dict[int, bytes] = vocab
-        self.merges: list[tuple[bytes, bytes]] = merges
+        # 反向词表 bytes → id
+        self.bytes_to_id: dict[bytes, int] = {b: idx for idx, b in vocab.items()}
+
+        # 合并优先级：pair -> 优先级序号（越小越先合并）
+        self.merge_rank: dict[tuple[bytes, bytes], int] = {}
+        for rank, pair in enumerate(merges):
+            self.merge_rank[pair] = rank
+
         self.special_tokens: list[str] = special_tokens if special_tokens is not None else []
 
-        # 反向映射：bytes -> token id
-        self.byte_to_id: dict[bytes, int] = {b: idx for idx, b in vocab.items()}
-        # BPE 合并优先级字典：pair -> merge 序号（序号越小优先级越高）
-        self.bpe_rank: dict[tuple[bytes, bytes], int] = {pair: i for i, pair in enumerate(merges)}
-        # 特殊 token 字节集合，加速判断
-        self.special_bytes_set: set[bytes] = {s.encode("utf-8") for s in self.special_tokens}
+    def _bpe_merge(self, raw_bytes: bytes) -> list[bytes]:
+        """对单个字节串执行完整BPE合并，返回子词字节列表"""
+        if not raw_bytes:
+            return []
+        tokens: list[bytes] = [bytes([b]) for b in raw_bytes]
 
-    def _pre_tokenize(self, text: str) -> list[str]:
-        """GPT2 预分词 + 特殊 token 隔离拆分，和训练阶段分词逻辑严格对齐"""
-        if not self.special_tokens:
-            return [m.group() for m in GPT2_PRETOKEN_PATTERN.finditer(text)]
+        while True:
+            min_rank = None
+            min_pair = None
+            for i in range(len(tokens) - 1):
+                pair = (tokens[i], tokens[i+1])
+                if pair in self.merge_rank:
+                    r = self.merge_rank[pair]
+                    if (min_rank is None) or r < min_rank:
+                        min_rank = r
+                        min_pair = (i, pair)
+            if min_pair is None:
+                break
 
-        # 长特殊token优先匹配分割
-        sorted_spec = sorted(self.special_tokens, key=len, reverse=True)
-        pat = "(" + "|".join(re.escape(t) for t in sorted_spec) + ")"
-        parts = re.split(pat, text)
-        res = []
-        for part in parts:
-            if not part:
-                continue
-            if part in self.special_tokens:
-                res.append(part)
-            else:
-                res.extend([m.group() for m in GPT2_PRETOKEN_PATTERN.finditer(part)])
-        return res
-
-    def _bpe_merge_word(self, token_bytes: bytes) -> list[bytes]:
-        """对单个字节单词执行迭代BPE合并，返回子词字节列表"""
-        # 拆成初始单字节列表
-        subwords = [bytes([b]) for b in token_bytes]
-        while len(subwords) > 1:
-            # 找出当前所有相邻pair里优先级最高（rank最小）的一对
-            min_rank = float("inf")
-            best_pair = None
-            for i in range(len(subwords) - 1):
-                pair = (subwords[i], subwords[i+1])
-                r = self.bpe_rank.get(pair, float("inf"))
-                if r < min_rank:
-                    min_rank = r
-                    best_pair = pair
-            if best_pair is None:
-                break  # 无可合并pair
-            # 原地合并
-            new_sub = []
-            i = 0
-            a, b = best_pair
-            while i < len(subwords):
-                if i < len(subwords)-1 and subwords[i] == a and subwords[i+1] == b:
-                    new_sub.append(a + b)
-                    i += 2
-                else:
-                    new_sub.append(subwords[i])
-                    i += 1
-            subwords = new_sub
-        return subwords
+            idx, target_pair = min_pair
+            new_token = target_pair[0] + target_pair[1]
+            tokens = tokens[:idx] + [new_token] + tokens[idx+2:]
+        return tokens
 
     def encode(self, text: str) -> list[int]:
-        """文本 -> token id 列表（对外主编码接口）"""
-        pre_tokens = self._pre_tokenize(text)
-        ids = []
-        for tok_str in pre_tokens:
-            tok_b = tok_str.encode("utf-8")
-            # 特殊token直接查表
-            if tok_b in self.byte_to_id:
-                ids.append(self.byte_to_id[tok_b])
-                continue
-            # 普通单词BPE合并
-            subs = self._bpe_merge_word(tok_b)
-            for sub_b in subs:
-                ids.append(self.byte_to_id[sub_b])
+        """完整字符串编码 → token id 列表，严格对齐 tiktoken gpt2"""
+        segments = pre_tokenize(text, self.special_tokens)
+        ids: list[int] = []
+        for seg in segments:
+            if seg in self.special_tokens:
+                seg_b = seg.encode("utf-8")
+                ids.append(self.bytes_to_id[seg_b])
+            else:
+                seg_bytes = seg.encode("utf-8")
+                sub_tokens = self._bpe_merge(seg_bytes)
+                for st in sub_tokens:
+                    ids.append(self.bytes_to_id[st])
         return ids
 
     def decode(self, ids: list[int]) -> str:
-        """token id 列表 -> 原始文本（对外主解码接口）"""
-        total_bytes = b"".join([self.vocab[idx] for idx in ids])
+        """id列表还原原始字符串，encode往返可逆"""
+        total_bytes = b""
+        for token_id in ids:
+            total_bytes += self.vocab[token_id]
         return total_bytes.decode("utf-8", errors="replace")
+
+    def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
+        """流式迭代编码，逐段生成id，极低内存占用"""
+        for chunk in iterable:
+            chunk_ids = self.encode(chunk)
+            for tid in chunk_ids:
+                yield tid
