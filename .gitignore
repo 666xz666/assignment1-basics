@@ -166,4 +166,7 @@ cython_debug/
 data/
 
 # vscode
-.vscode
+.vscode/
+
+# output
+output/
