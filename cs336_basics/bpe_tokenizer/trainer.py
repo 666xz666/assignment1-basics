@@ -131,7 +131,7 @@ class BPETrainer:
         # 全局词频: 单词ID元组 -> 出现频次
         self.global_word_freq: Counter[tuple[int, ...]] = Counter()
 
-        # Pair统计结构（朴素BPE每次全量重算，增量BPE可复用）
+        # Pair统计结构（增量BPE核心结构）
         self.pair_counts: Counter[tuple[int, int]] = Counter()
         self.pair_to_words: defaultdict[tuple[int, int], set[tuple[int, ...]]] = defaultdict(set)
 
@@ -182,7 +182,7 @@ class BPETrainer:
         self.global_word_freq = converted_freq
 
     def _init_pair_counts_full(self) -> None:
-        """朴素模式：遍历全部单词，一次性统计所有相邻Pair频次
+        """仅训练初始化时执行一次：遍历全部单词，一次性统计所有相邻Pair频次
         修复：完整判断多字节特殊Token，整体跳过内部Pair统计，防止被拆分
         """
         self.pair_counts.clear()
@@ -205,6 +205,28 @@ class BPETrainer:
                 self.pair_counts[pair] += freq
                 self.pair_to_words[pair].add(word_id_tuple)
 
+    def _remove_word_pairs(self, word_tup: tuple[int, ...], freq: int):
+        """删除一个单词全部相邻pair，扣减全局计数与反向映射"""
+        if len(word_tup) < 2:
+            return
+        for i in range(len(word_tup) - 1):
+            p = (word_tup[i], word_tup[i+1])
+            self.pair_counts[p] -= freq
+            self.pair_to_words[p].discard(word_tup)
+            # 频次清零则删除key，避免max读取无效0频pair
+            if self.pair_counts[p] <= 0:
+                del self.pair_counts[p]
+
+    def _add_word_pairs(self, word_tup: tuple[int, ...], freq: int):
+        """新增一个单词全部相邻pair，增加全局计数与反向映射；自动拦截特殊token"""
+        if len(word_tup) < 2:
+            return
+
+        for i in range(len(word_tup) - 1):
+            p = (word_tup[i], word_tup[i+1])
+            self.pair_counts[p] += freq
+            self.pair_to_words[p].add(word_tup)
+
     def _merge_word_tuple(
         self,
         word_id_tuple: tuple[int, ...],
@@ -225,30 +247,38 @@ class BPETrainer:
         return tuple(new_word)
 
     def _merge_one_step(self) -> bool:
-        """执行一轮BPE合并：选最优Pair -> 全局替换 -> 注册新词"""
+        """【增量更新版】一轮BPE合并：仅修改受影响单词与Pair，不再全局重统计"""
         if not self.pair_counts:
             return False
 
-        # 1. 选出频次最高Pair，同分按字节字典序更大优先（匹配你原有逻辑）
+        # 1. 择优逻辑完全不变：频次优先，同分字节字典序更大优先
         max_freq = max(self.pair_counts.values())
         candidate_pairs = [p for p, cnt in self.pair_counts.items() if cnt == max_freq]
         best_pair = max(
             candidate_pairs,
             key=lambda p: (self.id_to_byte[p[0]], self.id_to_byte[p[1]])
         )
-        id_a, id_b = best_pair
+        a, b = best_pair
         new_id = self.next_token_id
 
-        # 2. 全局替换该Pair，生成新词频表
-        new_global_freq = Counter()
-        for word_tup, cnt in self.global_word_freq.items():
-            merged_word = self._merge_word_tuple(word_tup, best_pair, new_id)
-            new_global_freq[merged_word] += cnt
-        self.global_word_freq = new_global_freq
+        # 2. 取出所有包含当前待合并pair的单词
+        affected_words = list(self.pair_to_words.get(best_pair, set()))
 
-        # 3. 注册新合并Token
-        byte_a = self.id_to_byte[id_a]
-        byte_b = self.id_to_byte[id_b]
+        # 3. 逐个增量更新单词、pair计数
+        for old_word in affected_words:
+            cnt = self.global_word_freq.pop(old_word)
+            # 移除旧单词所有pair计数
+            self._remove_word_pairs(old_word, cnt)
+            # 执行合并生成新单词
+            new_word = self._merge_word_tuple(old_word, best_pair, new_id)
+            # 更新全局词频
+            self.global_word_freq[new_word] = self.global_word_freq.get(new_word, 0) + cnt
+            # 添加新单词所有pair计数
+            self._add_word_pairs(new_word, cnt)
+
+        # 4. 注册新合并子词到词表（逻辑和朴素版完全一致）
+        byte_a = self.id_to_byte[a]
+        byte_b = self.id_to_byte[b]
         merged_byte = byte_a + byte_b
         self.merges.append((byte_a, byte_b))
 
@@ -257,8 +287,8 @@ class BPETrainer:
         self.id_to_byte[new_id] = merged_byte
         self.next_token_id += 1
 
-        # 朴素模式：每轮合并后全量重算Pair
-        self._init_pair_counts_full()
+        # 增量核心改动：删除全局重统计pair的调用
+        # self._init_pair_counts_full()
         return True
 
     def train(self) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
@@ -267,12 +297,12 @@ class BPETrainer:
         profiler = cProfile.Profile()
         profiler.enable()
 
-        # 初始化流程
+        # 初始化流程（仅此处全局统计一次pair）
         self._init_vocab_mappings()
         self._count_corpus()
         self._init_pair_counts_full()
 
-        # 迭代合并
+        # 迭代增量合并
         while len(self.vocab) < self.target_vocab_size:
             success = self._merge_one_step()
             if not success:
