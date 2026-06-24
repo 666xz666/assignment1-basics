@@ -103,6 +103,18 @@ class BPETrainer:
         # 自动CPU核心数，支持外部手动指定进程数
         self.num_processers: int = num_processers if num_processers is not None else multiprocessing.cpu_count()
 
+        # ========== 新增健壮性校验 ==========
+        base_byte_vocab_size = 256
+        num_special = len(self.special_tokens)
+        min_required_vocab = base_byte_vocab_size + num_special
+        if self.target_vocab_size < min_required_vocab:
+            raise ValueError(
+                f"目标词表大小过小！"
+                f"\n基础字节词表固定256个，特殊token共{num_special}个，"
+                f"\n最少需要 vocab_size = {min_required_vocab}，"
+                f"\n当前传入 vocab_size = {self.target_vocab_size}，请调大词表上限。"
+            )
+
         # 特殊token字节缓存
         self.special_token_bytes: list[bytes] = [s.encode("utf-8") for s in special_tokens]
         self.special_byte_set: set[bytes] = set(self.special_token_bytes)
