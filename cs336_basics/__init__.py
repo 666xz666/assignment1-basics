@@ -1,5 +1,6 @@
 import importlib.metadata
-from .tokenizer import train_bpe
+from .bpe_tokenizer.tokenizer import BPETokenizer
+from .bpe_tokenizer.trainer import BPETrainer
 
 try:
     __version__ = importlib.metadata.version("cs336_basics")
@@ -7,5 +8,6 @@ except importlib.metadata.PackageNotFoundError:
     pass
 
 __all__ = [
-    "train_bpe"
+    "BPETokenizer",
+    "BPETrainer"
 ]

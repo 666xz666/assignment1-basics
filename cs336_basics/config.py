@@ -1,2 +1,0 @@
-
-NUM_PROCESSERS = 20 # 最大线程数
