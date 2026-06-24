@@ -3,66 +3,64 @@ import pathlib
 from collections import Counter, defaultdict
 from typing import BinaryIO
 import multiprocessing
-import ahocorasick
 
 from cs336_basics.bpe_tokenizer.utils import pre_tokenize
 
 def find_chunk_boundaries(
     file: BinaryIO,
     desired_num_chunks: int,
-    split_special_tokens: list[bytes],
+    special_token_bytes: list[bytes],
 ) -> list[int]:
     """
-    使用AC自动机多模式匹配，对齐特殊token切分文件，避免特殊token跨块截断
+    Chunk the file into parts that can be counted independently.
+    Split on ANY of the provided special tokens.
+    May return fewer chunks if the boundaries end up overlapping.
     """
-    # 参数校验
-    for tok in split_special_tokens:
-        assert isinstance(tok, bytes), "All special tokens must be bytestring"
-    if not split_special_tokens:
-        raise ValueError("split_special_tokens cannot be empty")
+    # 参数校验：必须是非空bytes列表
+    assert isinstance(special_token_bytes, list), "split_tokens must be a list of bytestrings"
+    assert len(special_token_bytes) > 0, "split_tokens cannot be empty list"
+    for tok in special_token_bytes:
+        assert isinstance(tok, bytes), "Each split token must be represented as a bytestring"
 
-    def _build_token_automaton(tokens: list[bytes]) -> ahocorasick.Automaton:
-        automaton = ahocorasick.Automaton()
-        for idx, tok in enumerate(tokens):
-            tok_str = tok.decode("utf-8")
-            automaton.add_word(tok_str, (idx, tok))
-        automaton.make_automaton()
-        return automaton
-
-    automaton = _build_token_automaton(split_special_tokens)
-
+    # Get total file size in bytes
     file.seek(0, os.SEEK_END)
     file_size = file.tell()
     file.seek(0)
 
     chunk_size = file_size // desired_num_chunks
+
+    # Initial guesses for chunk boundary locations, uniformly spaced
+    # Chunks start on previous index, don't include last index
     chunk_boundaries = [i * chunk_size for i in range(desired_num_chunks + 1)]
     chunk_boundaries[-1] = file_size
 
-    mini_chunk_size = 4096
+    mini_chunk_size = 4096  # Read ahead by 4k bytes at a time
 
     for bi in range(1, len(chunk_boundaries) - 1):
         initial_position = chunk_boundaries[bi]
-        file.seek(initial_position)
-
+        file.seek(initial_position)  # Start at boundary guess
         while True:
-            mini_chunk = file.read(mini_chunk_size)
+            mini_chunk = file.read(mini_chunk_size)  # Read a mini chunk
+
+            # If EOF, this boundary should be at the end of the file
             if mini_chunk == b"":
                 chunk_boundaries[bi] = file_size
                 break
 
-            min_offset = None
-            chunk_str = mini_chunk.decode("utf-8", errors="ignore")
-            for end_idx, (_, tok_bytes) in automaton.iter(chunk_str):
-                start_idx = end_idx - len(tok_bytes) + 1
-                if (min_offset is None) or (start_idx < min_offset):
-                    min_offset = start_idx
+            # 遍历所有分隔符，找到最早出现的匹配位置
+            min_pos = None
+            for tok in special_token_bytes:
+                pos = mini_chunk.find(tok)
+                if pos != -1:
+                    if min_pos is None or pos < min_pos:
+                        min_pos = pos
 
-            if min_offset is not None:
-                chunk_boundaries[bi] = initial_position + min_offset
+            if min_pos is not None:
+                chunk_boundaries[bi] = initial_position + min_pos
                 break
             initial_position += mini_chunk_size
 
+    # Make sure all boundaries are unique, but might be fewer than desired_num_chunks
     return sorted(set(chunk_boundaries))
 
 def process_chunk(args) -> Counter[tuple[int, ...]]:
@@ -156,18 +154,16 @@ class BPETrainer:
     def _count_corpus(self) -> None:
         """多进程分片统计全局预分词频次，适配process_chunk输出int元组"""
         with open(self.input_path, "rb") as f:
-            boundaries = find_chunk_boundaries(f, self.num_processers, self.special_token_bytes)
+            boundaries = find_chunk_boundaries(f, 1000, self.special_token_bytes)
 
         tasks = []
         for start, end in zip(boundaries[:-1], boundaries[1:]):
             tasks.append((self.input_path, start, end, self.special_tokens))
 
         with multiprocessing.Pool(processes=self.num_processers) as pool:
-            chunk_counters = pool.map(process_chunk, tasks)
-
-        # 汇总所有分片词频
-        for cnt in chunk_counters:
-            self.global_word_freq.update(cnt)
+            for chunk_cnt in pool.imap_unordered(process_chunk, tasks):
+                self.global_word_freq.update(chunk_cnt)
+                del chunk_cnt
 
         # 转换：tuple[int(字节值)] → tuple[token_id]
         converted_freq = Counter()
