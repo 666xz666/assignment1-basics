@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import Iterator, Iterable
+from typing import Iterator, Iterable, List, Tuple
+from pathlib import Path
+import json
 
 from cs336_basics.bpe_tokenizer.utils import pre_tokenize
 
@@ -36,20 +38,21 @@ class BPETokenizer:
 
         while True:
             min_rank = None
-            min_pair = None
+            min_idx = -1
+            # 本轮完整从头到尾扫描，严格匹配GPT2每轮全局选最小
             for i in range(len(tokens) - 1):
                 pair = (tokens[i], tokens[i+1])
-                if pair in self.merge_rank:
-                    r = self.merge_rank[pair]
-                    if (min_rank is None) or r < min_rank:
-                        min_rank = r
-                        min_pair = (i, pair)
-            if min_pair is None:
+                r = self.merge_rank.get(pair)
+                if r is None:
+                    continue
+                if (min_rank is None) or r < min_rank:
+                    min_rank = r
+                    min_idx = i
+            if min_idx == -1:
                 break
-
-            idx, target_pair = min_pair
-            new_token = target_pair[0] + target_pair[1]
-            tokens = tokens[:idx] + [new_token] + tokens[idx+2:]
+            # 原地合并，减少列表拷贝，算法逻辑不变
+            new_token = tokens[min_idx] + tokens[min_idx+1]
+            tokens[min_idx:min_idx+2] = [new_token]
         return tokens
 
     def encode(self, text: str) -> list[int]:
@@ -80,3 +83,27 @@ class BPETokenizer:
             chunk_ids = self.encode(chunk)
             for tid in chunk_ids:
                 yield tid
+
+def load_bpe_tokenizer(out_dir: str, special_tokens: list[str]) -> BPETokenizer:
+    vocab_path = Path(out_dir) / "vocab.json"
+    merges_path = Path(out_dir) / "merges.txt"
+
+    with open(vocab_path, "r", encoding="utf-8") as f:
+        vocab_raw = json.load(f)
+    vocab: dict[int, bytes] = {}
+    for sid_str, byte_list in vocab_raw.items():
+        sid = int(sid_str)
+        vocab[sid] = bytes(byte_list)
+
+    merges: List[Tuple[bytes, bytes]] = []
+    with open(merges_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            part1, part2 = line.split()
+            b1 = bytes(int(x) for x in part1.split(","))
+            b2 = bytes(int(x) for x in part2.split(","))
+            merges.append((b1, b2))
+
+    return BPETokenizer(vocab, merges, special_tokens=special_tokens)
