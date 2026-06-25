@@ -54,7 +54,7 @@ def convert_vocab_and_merges(
 
 if __name__ == "__main__":
     # 路径配置（和你训练输出目录对齐）
-    work_dir = os.path.join("output", "run_bpe_train_on_tinystories_output")
+    work_dir = os.path.join("output", "run_bpe_train_on_owt_output")
 
     vocab_input = os.path.join(work_dir, "vocab.json")
     merges_num_input = os.path.join(work_dir, "merges.txt")

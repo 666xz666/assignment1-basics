@@ -13,9 +13,10 @@ def main():
     snapshot_start = tracemalloc.take_snapshot()
 
     trainer = BPETrainer(
-        "/home/projects/CS336/assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", 
-        10_000, 
-        ["<|endoftext|>"]
+        "/home/projects/CS336/assignment1-basics/data/owt_train.txt", 
+        32_000, 
+        ["<|endoftext|>"],
+        5000
     )
     vocab, merges = trainer.train()
 
@@ -53,7 +54,7 @@ def main():
 
     # 保存产生结果
     output_root = "output"
-    output_dir = os.path.join(output_root, "run_bpe_train_on_tinystories_output")
+    output_dir = os.path.join(output_root, "run_bpe_train_on_owt_output")
     os.makedirs(output_dir, exist_ok=True)
     readable_vocab = {int(k): list(v) for k, v in vocab.items()}
     vocab_path = os.path.join(output_dir, "vocab.json")
