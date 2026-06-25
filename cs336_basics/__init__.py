@@ -1,5 +1,5 @@
 import importlib.metadata
-from .bpe_tokenizer.tokenizer import BPETokenizer
+from .bpe_tokenizer.tokenizer import BPETokenizer, load_bpe_tokenizer
 from .bpe_tokenizer.trainer import BPETrainer
 
 try:
@@ -9,5 +9,6 @@ except importlib.metadata.PackageNotFoundError:
 
 __all__ = [
     "BPETokenizer",
-    "BPETrainer"
+    "BPETrainer",
+    "load_bpe_tokenizer"
 ]
