@@ -1,6 +1,6 @@
 import os
 import json
-from cs336_basics import BPETrainer, BPETokenizer
+from cs336_basics import BPETrainer
 
 def main():
     import cProfile, pstats
