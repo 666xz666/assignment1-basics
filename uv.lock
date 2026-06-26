@@ -104,6 +104,11 @@ dependencies = [
     { name = "wandb" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "einops", specifier = ">=0.8" },
@@ -122,6 +127,9 @@ requires-dist = [
     { name = "ty", specifier = ">=0.0.26" },
     { name = "wandb", specifier = ">=0.25" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.15.8" }]
 
 [[package]]
 name = "cuda-bindings"
