@@ -16,6 +16,7 @@ from .nn import (
     TransformerLM,
     TransformerBlock,
 )
+from .optim import SGD
 
 from .utils import cross_entropy
 
@@ -40,5 +41,6 @@ __all__ = [
     "MultiheadSelfAttention",
     "TransformerLM",
     "TransformerBlock",
-    "cross_entropy"
+    "cross_entropy",
+    "SGD",
 ]
