@@ -8,20 +8,20 @@ from .scaled_dot_product_attention import ScaledDotProductAttention
 
 
 class MultiheadSelfAttention(nn.Module):
-    """
+    r"""
     Causal Multi-Head Self-Attention 因果多头自注意力，实现 Vaswani 等人原始 Transformer 多头注意力结构
     数学定义：
-    \[
+    $$
     \begin{align*}
     \text{MultiHead}(Q,K,V) &= \text{Concat}(\text{head}_1,\dots,\text{head}_h) \\
     \text{head}_i &= \text{Attention}(Q_i,K_i,V_i)
     \end{align*}
-    \]
+    $$
     其中 $Q_i,K_i,V_i$ 分别为 $Q,K,V$ 在特征维度上划分出的第 $i$ 个头，单头执行缩放点积注意力运算；
     完整自注意力前向运算：
-    \[
+    $$
     \text{MultiHeadSelfAttention}(x) = W_O \cdot \text{MultiHead}\big(W_Q x,\ W_K x,\ W_V x\big)
-    \]
+    $$
     可学习参数：
     $W_Q \in \mathbb{R}^{h d_k \times d_\text{model}},\ W_K \in \mathbb{R}^{h d_k \times d_\text{model}},\ W_V \in \mathbb{R}^{h d_v \times d_\text{model}},\ W_O \in \mathbb{R}^{d_\text{model} \times h d_v}$
     内置因果掩码约束：token $i$ 仅能访问位置 $j \le i$，无法看到未来时序位置；
