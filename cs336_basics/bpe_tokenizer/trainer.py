@@ -6,6 +6,7 @@ import multiprocessing
 
 from cs336_basics.bpe_tokenizer.utils import pre_tokenize
 
+
 def find_chunk_boundaries(
     file: BinaryIO,
     desired_num_chunks: int,
@@ -17,10 +18,14 @@ def find_chunk_boundaries(
     May return fewer chunks if the boundaries end up overlapping.
     """
     # 参数校验：必须是非空bytes列表
-    assert isinstance(special_token_bytes, list), "split_tokens must be a list of bytestrings"
+    assert isinstance(special_token_bytes, list), (
+        "split_tokens must be a list of bytestrings"
+    )
     assert len(special_token_bytes) > 0, "split_tokens cannot be empty list"
     for tok in special_token_bytes:
-        assert isinstance(tok, bytes), "Each split token must be represented as a bytestring"
+        assert isinstance(tok, bytes), (
+            "Each split token must be represented as a bytestring"
+        )
 
     # Get total file size in bytes
     file.seek(0, os.SEEK_END)
@@ -63,6 +68,7 @@ def find_chunk_boundaries(
     # Make sure all boundaries are unique, but might be fewer than desired_num_chunks
     return sorted(set(chunk_boundaries))
 
+
 def process_chunk(args) -> Counter[tuple[int, ...]]:
     """
     单进程处理文件分片，GPT2预分词 + 特殊token隔离，返回词频
@@ -74,7 +80,7 @@ def process_chunk(args) -> Counter[tuple[int, ...]]:
     >>> tu = tuple(str.encode("utf-8", errors="ignore"))
     >>> tu
     (104, 101, 108, 108, 111)
-    >>> 
+    >>>
     """
     input_path, start, end, special_tokens = args
     word_counter = Counter()
@@ -98,13 +104,14 @@ def process_chunk(args) -> Counter[tuple[int, ...]]:
 
     return word_counter
 
+
 class BPETrainer:
     def __init__(
         self,
         input_path: pathlib.Path,
         vocab_size: int,
         special_tokens: list[str],
-        desired_num_chunks: int | None = 1000
+        desired_num_chunks: int | None = 1000,
     ):
         # ========== 新增健壮性校验 ==========
         base_byte_vocab_size = 256
@@ -125,17 +132,21 @@ class BPETrainer:
         self.desired_num_chunks: int = desired_num_chunks
 
         # 特殊token字节缓存
-        self.special_token_bytes :list[bytes] = [s.encode("utf-8", errors="ignore") for s in self.special_tokens]
+        self.special_token_bytes: list[bytes] = [
+            s.encode("utf-8", errors="ignore") for s in self.special_tokens
+        ]
         self.special_token_byte_set: set[bytes] = set(self.special_token_bytes)
 
         # 全局词表映射
         self.vocab: dict[int, bytes] = {}
         self.next_token_id = 0
-        
+
         # Pair统计结构（增量BPE核心结构）这里存的int全部都是词表中对应的id
         self.word_counts: Counter[tuple[int, int]] = Counter()
         self.pair_counts: Counter[tuple[int, int]] = Counter()
-        self.pair_to_words: defaultdict[tuple[int, int], set[tuple[int, ...]]] = defaultdict(set)
+        self.pair_to_words: defaultdict[tuple[int, int], set[tuple[int, ...]]] = (
+            defaultdict(set)
+        )
         self.cur_max_pair_freq: int = -1
         self.candidates: set[tuple[int, int]] = set()
         self.changed_pairs: set[tuple[int, int]] = set()
@@ -159,16 +170,14 @@ class BPETrainer:
         """多进程分片统计全局预分词频次，适配process_chunk输出int元组"""
         with open(self.input_path, "rb") as f:
             boundaries = find_chunk_boundaries(
-                f, 
-                self.desired_num_chunks, 
-                self.special_token_bytes
-                )
+                f, self.desired_num_chunks, self.special_token_bytes
+            )
 
         tasks = []
         for start, end in zip(boundaries[:-1], boundaries[1:]):
             tasks.append((self.input_path, start, end, self.special_tokens))
 
-        num_processers=multiprocessing.cpu_count()
+        num_processers = multiprocessing.cpu_count()
         with multiprocessing.Pool(num_processers) as pool:
             # 流式处理多线程结果（因为操作符合交换律）
             for res in pool.imap_unordered(process_chunk, tasks):
@@ -182,7 +191,9 @@ class BPETrainer:
             for p in zip(word_ids[:-1], word_ids[1:]):
                 # 统计pair信息
                 self.pair_counts[p] += cnt
-                self.cur_max_pair_freq = max(self.cur_max_pair_freq, self.pair_counts[p])
+                self.cur_max_pair_freq = max(
+                    self.cur_max_pair_freq, self.pair_counts[p]
+                )
                 self.pair_to_words[p].add(tuple(word_ids))
                 self.candidates.add(p)
 
@@ -191,14 +202,14 @@ class BPETrainer:
         pair: tuple[int, int],
         word: tuple[int, ...],
         word_count: int,
-        pair_id:int
+        pair_id: int,
     ) -> list[int]:
         """把word中的pair替换成新词汇id， 返回new_word"""
         new_word = []
         i = 0
         has_pair = False
         while i < len(word):
-            if i+1 < len(word) and word[i] == pair[0] and word[i+1] == pair[1]:
+            if i + 1 < len(word) and word[i] == pair[0] and word[i + 1] == pair[1]:
                 has_pair = True
                 new_word.append(pair_id)
                 i += 2
@@ -210,7 +221,7 @@ class BPETrainer:
         # 这里操作是先把旧word影响一整个删掉，
         # 再添加new_word的影响
         # 直觉上只要修改best_pair两边的pair
-        # 但是时间复杂度是一样的（极端情况word是best_pair循环组成的）   
+        # 但是时间复杂度是一样的（极端情况word是best_pair循环组成的）
         # 而整体操作比较简单
         if has_pair:
             for p in zip(word[:-1], word[1:]):
@@ -218,7 +229,7 @@ class BPETrainer:
                 if self.pair_counts[p] <= 0:
                     # 剪枝
                     del self.pair_counts[p]
-                self.pair_to_words[p].discard(word) 
+                self.pair_to_words[p].discard(word)
 
             for p in zip(new_word[:-1], new_word[1:]):
                 self.pair_counts[p] += word_count
@@ -231,20 +242,30 @@ class BPETrainer:
         """【增量更新版】一轮BPE合并：仅修改受影响单词与Pair，不再全局重统计"""
         if not self.pair_counts:
             return False
-        
+
         # 更新candidates
         self.candidates.update(self.changed_pairs)
         self.changed_pairs = set()
         local_max = max(self.pair_counts[p] for p in self.candidates)
         if local_max < self.cur_max_pair_freq:
             self.cur_max_pair_freq = max(self.pair_counts.values())
-            self.candidates = {p for p, cnt in self.pair_counts.items() if cnt == self.cur_max_pair_freq}
+            self.candidates = {
+                p
+                for p, cnt in self.pair_counts.items()
+                if cnt == self.cur_max_pair_freq
+            }
         else:
             self.cur_max_pair_freq = local_max
-            self.candidates = {p for p in self.candidates if self.pair_counts[p] == self.cur_max_pair_freq}
-        
+            self.candidates = {
+                p
+                for p in self.candidates
+                if self.pair_counts[p] == self.cur_max_pair_freq
+            }
+
         # 获取best_pair
-        best_pair = max(self.candidates, key = lambda p: (self.vocab[p[0]], self.vocab[p[1]]))
+        best_pair = max(
+            self.candidates, key=lambda p: (self.vocab[p[0]], self.vocab[p[1]])
+        )
 
         # 更新词汇和合并规则
         new_id = self.next_token_id

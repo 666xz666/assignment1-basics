@@ -5,10 +5,11 @@ _GPT2_PRE_PATTERN = re.compile(
     r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 )
 
+
 def pre_tokenize(
     text: str,
     special_tokens: list[str] | None = None,
-    base_pattern: re.Pattern | None = None
+    base_pattern: re.Pattern | None = None,
 ) -> list[str]:
     """
     通用预分词入口，默认内置GPT2预分词规则

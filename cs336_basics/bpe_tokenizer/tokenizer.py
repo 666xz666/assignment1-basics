@@ -5,12 +5,13 @@ import json
 
 from cs336_basics.bpe_tokenizer.utils import pre_tokenize
 
+
 class BPETokenizer:
     def __init__(
         self,
         vocab: dict[int, bytes],
         merges: list[tuple[bytes, bytes]],
-        special_tokens: list[str] | None = None
+        special_tokens: list[str] | None = None,
     ):
         """
         GPT2 风格 BPE 分词器，对齐 tiktoken 行为
@@ -28,7 +29,9 @@ class BPETokenizer:
         for rank, pair in enumerate(merges):
             self.merge_rank[pair] = rank
 
-        self.special_tokens: list[str] = special_tokens if special_tokens is not None else []
+        self.special_tokens: list[str] = (
+            special_tokens if special_tokens is not None else []
+        )
 
     def _bpe_merge(self, raw_bytes: bytes) -> list[bytes]:
         """对单个字节串执行完整BPE合并，返回子词字节列表"""
@@ -41,7 +44,7 @@ class BPETokenizer:
             min_idx = -1
             # 本轮完整从头到尾扫描，严格匹配GPT2每轮全局选最小
             for i in range(len(tokens) - 1):
-                pair = (tokens[i], tokens[i+1])
+                pair = (tokens[i], tokens[i + 1])
                 r = self.merge_rank.get(pair)
                 if r is None:
                     continue
@@ -51,8 +54,8 @@ class BPETokenizer:
             if min_idx == -1:
                 break
             # 原地合并，减少列表拷贝，算法逻辑不变
-            new_token = tokens[min_idx] + tokens[min_idx+1]
-            tokens[min_idx:min_idx+2] = [new_token]
+            new_token = tokens[min_idx] + tokens[min_idx + 1]
+            tokens[min_idx : min_idx + 2] = [new_token]
         return tokens
 
     def encode(self, text: str) -> list[int]:
@@ -83,6 +86,7 @@ class BPETokenizer:
             chunk_ids = self.encode(chunk)
             for tid in chunk_ids:
                 yield tid
+
 
 def load_bpe_tokenizer(out_dir: str, special_tokens: list[str]) -> BPETokenizer:
     vocab_path = Path(out_dir) / "vocab.json"
