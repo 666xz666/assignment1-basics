@@ -12,7 +12,7 @@ class RoPE(nn.Module):
         device=None,
         dtype: torch.dtype | None = None,
     ):
-        """
+        r"""
         NOTE: 有缓存，可以考虑全局就一个RoPE，所有层共享
         构建RoPE模块，预计算并注册cos、sin旋转位置编码缓冲区
         RoPE 角度计算公式 LaTeX：
@@ -30,7 +30,6 @@ class RoPE(nn.Module):
         \sin(\theta_{i,k}) & \cos(\theta_{i,k})
         \end{pmatrix}
         $$
-
         :param theta: float, RoPE公式中的基底超参数$\Theta$
         :param d_k: int, Query/Key向量的单头维度，需为偶数（RoPE按两两维度成对旋转）
         :param max_seq_len: int, 模型支持的最大输入序列长度，用于预计算位置编码

@@ -33,13 +33,13 @@ class RMSNorm(nn.Module):
         x_sq = x**2
         sum_sq = x_sq.sum(-1, keepdim=True)
         """
-        \operatorname{RMS}(a) = \sqrt{\frac{1}{d_{\text{model}}}\sum_{i=1}^{d_{\text{model}}} a_i^2 + \varepsilon}
+        $$\operatorname{RMS}(a) = \sqrt{\frac{1}{d_{\text{model}}}\sum_{i=1}^{d_{\text{model}}} a_i^2 + \varepsilon}$$
         
         rms shape: (batch_size, max_len, 1)
         """
         rms = torch.sqrt(1.0 / self.d_model * sum_sq + self.eps)
         """
-        \operatorname{RMSNorm}(a_i) = \frac{a_i}{\operatorname{RMS}(a)}\,g_i
+        $$\operatorname{RMSNorm}(a_i) = \frac{a_i}{\operatorname{RMS}(a)}\,g_i$$
         """
         result = (x / rms) * self.g
         return result.to(in_dtype)

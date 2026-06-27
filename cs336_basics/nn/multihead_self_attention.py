@@ -45,7 +45,7 @@ class MultiheadSelfAttention(nn.Module):
         theta: float | None = None,
         max_seq_len: int | None = -1,
     ):
-        """
+        r"""
         初始化因果多头自注意力模块，包含QKV投影、RoPE位置编码、多头注意力计算组件
 
         Args:
@@ -91,15 +91,15 @@ class MultiheadSelfAttention(nn.Module):
     def forward(
         self, x: torch.Tensor, token_positions: torch.Tensor | None = None
     ) -> torch.Tensor:
-        """
+        r"""
         前向传播执行因果多头自注意力计算
 
         Args:
-            x: 输入特征张量，形状 $(\dots,\ \text{seq_len},\ d_\text{model})$
+            x: 输入特征张量，形状 $(\dots,\ \text{seq\_len},\ d_\text{model})$
             token_positions: RoPE 所需位置下标张量，形状匹配序列维度；不启用RoPE仍需占位传参
 
         Returns:
-            torch.Tensor: 多头注意力输出特征，形状与输入 x 完全一致 $(\dots,\ \text{seq_len},\ d_\text{model})$
+            torch.Tensor: 多头注意力输出特征，形状与输入 x 完全一致 $(\dots,\ \text{seq\_len},\ d_\text{model})$
         """
         q = self.Proj_q(x)
         k = self.Proj_k(x)

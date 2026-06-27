@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import einops
 
+from ..utils.function import softmax
+
 class Softmax(nn.Module):
-    """
+    r"""
     自定义 Softmax 网络层，对齐 PyTorch nn.Softmax 设计
     Softmax 计算公式 LaTeX：
     $$
@@ -23,18 +25,6 @@ class Softmax(nn.Module):
 
         Returns:
             归一化后同形状张量
-
-        NOTE: exp（x）在较大值时可以变为inf（则inf / inf = NaN）
-        softmax 操作对对所有输入添加任意常数 c 保持不变。
-        通常，我们会从v的所有元素中减去v中最大的元素，使得新的最大元素为0。
         """
-        # shape: (..., dim, ...) 形状不变
-        # keepdim=False 时: (..., 1, ...)
-        # .values返回张量结果
-        # .indices返回下标
-        max_val = x.max(dim=self.dim, keepdim=True).values
-        y = x - max_val
-        exp = torch.exp(y)
-        exp_sum = exp.sum(dim=self.dim, keepdim=True)
-        return exp / exp_sum
+        return softmax(x, self.dim)
         

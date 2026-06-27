@@ -9,10 +9,10 @@ from .softmax import Softmax
 
 
 class TransformerLM(nn.Module):
-    """
+    r"""
     Decoder-only 结构 Transformer 自回归语言模型（Pre-Norm 架构，搭配 RoPE 旋转位置编码）
     整体前向流程：
-    \[
+    $$
     \begin{align*}
     &\text{token\_emb} = \text{Embedding}(tokens) \\
     &h_0 = \text{token\_emb} \\
@@ -20,7 +20,7 @@ class TransformerLM(nn.Module):
     &h_{\text{final}} = \text{RMSNorm}(h_{\text{num\_layers}}) \\
     &\text{logits} = h_{\text{final}} \cdot \text{W}_{\text{lm\_head}}^\top
     \end{align*}
-    \]
+    $$
     模块组成：
     1. Token 嵌入层：将离散 token id 映射为 $d_\text{model}$ 维度向量
     2. 堆叠多层因果 Pre-Norm Transformer Block（内置多头自注意力 + SwiGLU FFN + RoPE）
@@ -91,7 +91,7 @@ class TransformerLM(nn.Module):
     def forward(
         self, token_ids: torch.Tensor, token_positions: torch.Tensor | None = None
     ) -> torch.Tensor:
-        """
+        r"""
         Transformer 语言模型前向推理，输出逐位置词汇 logits
 
         Args:

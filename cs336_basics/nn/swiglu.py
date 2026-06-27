@@ -32,7 +32,7 @@ class SwiGLUFeedForward(nn.Module):
         self.act = SiLU()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
+        r"""
         Position-wise SwiGLU forward pass, operates independently on every token position.
         Input shape:  (batch_size, sequence_length, d_model)
         Output shape: (batch_size, sequence_length, d_model)

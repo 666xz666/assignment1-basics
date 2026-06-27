@@ -6,7 +6,7 @@ from .softmax import Softmax
 
 
 class ScaledDotProductAttention(nn.Module):
-    """
+    r"""
     缩放点积注意力封装层，无可训练参数，仅做前向运算，兼容3维、4维多头输入格式
     计算公式 LaTeX：
     $$

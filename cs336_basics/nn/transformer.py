@@ -7,15 +7,15 @@ from .swiglu import SwiGLUFeedForward
 
 
 class TransformerBlock(nn.Module):
-    """
+    r"""
     Pre-Norm 结构 Transformer 解码器块（因果多头自注意力 + SwiGLU 前馈网络）
     使用 RMSNorm 作为前置归一化，标准两层残差结构，数学流程：
-    \[
+    $$
     \begin{align*}
     x_1 &= x + \text{MultiHeadSelfAttention}\big(\text{RMSNorm}_1(x)\big) \\
     x_{\text{out}} &= x_1 + \text{SwiGLUFFN}\big(\text{RMSNorm}_2(x_1)\big)
     \end{align*}
-    \]
+    $$
     两层独立残差分支：
     1. 输入先经过 RMSNorm 归一化 → 因果多头自注意力 → 残差回加原输入
     2. 中间特征再次独立 RMSNorm 归一化 → SwiGLU 位置前馈网络 → 残差回加
@@ -64,18 +64,18 @@ class TransformerBlock(nn.Module):
     def forward(
         self, x: torch.Tensor, token_positions: torch.Tensor | None = None
     ) -> torch.Tensor:
-        """
+        r"""
         Transformer Block 前向传播
 
         Args:
             x: torch.Tensor
-                输入特征张量，形状 $(\dots,\ \text{seq_len},\ d_\text{model})$
+                输入特征张量，形状 $(\dots,\ \text{seq\_len},\ d_\text{model})$
             token_positions: torch.Tensor | None
                 RoPE 所需位置下标张量；未启用 RoPE 时传 None 即可自动内部适配占位
 
         Returns:
             torch.Tensor
-                块输出特征张量，形状与输入 x 完全一致 $(\dots,\ \text{seq_len},\ d_\text{model})$
+                块输出特征张量，形状与输入 x 完全一致 $(\dots,\ \text{seq\_len},\ d_\text{model})$
         """
         # Pre-Norm + 多头注意力 + 残差连接
         residual = x
