@@ -5,6 +5,10 @@ import math
 
 
 class SGD(torch.optim.Optimizer):
+    """
+    简单实现的SGD优化器，复制于教材
+    """
+
     def __init__(self, params, lr=1e-3):
         if lr < 0:
             raise ValueError(f"Invalid learning rate: {lr}")
