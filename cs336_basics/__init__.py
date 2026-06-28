@@ -17,7 +17,6 @@ from .nn import (
     TransformerBlock,
 )
 from .optim import SGD
-
 from .utils import cross_entropy
 
 try:
