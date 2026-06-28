@@ -16,7 +16,7 @@ from .nn import (
     TransformerLM,
     TransformerBlock,
 )
-from .optim import SGD
+from .optim import SGD, AdamW
 from .utils import cross_entropy
 
 try:
@@ -42,4 +42,5 @@ __all__ = [
     "TransformerBlock",
     "cross_entropy",
     "SGD",
+    "AdamW",
 ]
