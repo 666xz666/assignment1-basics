@@ -1,6 +1,5 @@
 import importlib.metadata
 
-# 从子包统一导入，不再写深层文件路径
 from .utils import try_gpu
 from .bpe_tokenizer import BPETokenizer, BPETrainer, load_bpe_tokenizer
 from .nn import (
@@ -16,7 +15,7 @@ from .nn import (
     TransformerLM,
     TransformerBlock,
 )
-from .optim import SGD, AdamW
+from .optim import SGD, AdamW, get_lr_cosine_schedule, CosineAnnealingWarmupLR
 from .utils import cross_entropy
 
 try:
@@ -43,4 +42,6 @@ __all__ = [
     "cross_entropy",
     "SGD",
     "AdamW",
+    "get_lr_cosine_schedule",
+    "CosineAnnealingWarmupLR",
 ]
