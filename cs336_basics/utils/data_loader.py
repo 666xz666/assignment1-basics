@@ -7,9 +7,9 @@ def get_batch(
     dataset: npt.NDArray, batch_size: int, context_length: int, device: str
 ) -> tuple[torch.Tensor, torch.Tensor]:
     r"""
-    Sample a single batch of input-target subsequences for autoregressive next-token language modeling.
-    Given a long flat token-ID array, randomly sample starting positions, construct input sequences
-    and their corresponding shift-right target sequences.
+    对单批输入目标子序列进行采样，用于自回归下一标记语言建模。
+    给定一个长的扁平token-ID数组，随机采样起始位置，构造输入序列
+    及其对应的右移目标序列。
 
     Rule:
     For a starting index $i$:
