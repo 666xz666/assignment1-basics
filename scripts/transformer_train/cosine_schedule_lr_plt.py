@@ -99,7 +99,7 @@ plt.legend(fontsize=9.5)
 plt.tight_layout()
 
 # 目标保存路径
-save_dir = "./output/logs/plt"
+save_dir = "./output/plt"
 os.makedirs(save_dir, exist_ok=True)  # 自动递归创建文件夹，不存在则新建
 save_path = os.path.join(save_dir, "lr_cosine_schedule_curve.png")
 
