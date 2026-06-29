@@ -6,7 +6,7 @@ def gradient_clipping(
     parameters: Iterable[torch.nn.Parameter], max_l2_norm: float, eps: float = 1e-6
 ) -> None:
     r"""
-    Perform global gradient clipping by total $\ell_2$ norm, modify gradients in-place.
+    按总$\ell_2$范数执行全局梯度裁剪，就地修改梯度。
 
     ### Algorithm Definition
     Let the concatenated global gradient vector of all trainable parameters be $\boldsymbol{g}$.

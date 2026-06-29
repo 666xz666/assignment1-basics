@@ -11,8 +11,8 @@ def save_checkpoint(
     out: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
 ) -> None:
     r"""
-    Save training checkpoint containing model weights, optimizer state, and current iteration step.
-    Pack all states into a dictionary container, then serialize via torch.save to target destination.
+    保存包含模型权重、优化器状态和当前迭代步骤的训练检查点。
+    将所有状态打包到一个字典容器中，然后通过torch序列化。保存到指定路径。
 
     Stored contents overview:
     $$
