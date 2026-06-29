@@ -44,8 +44,3 @@ def get_batch(
     target_tokens = torch.tensor(np.stack(target_list), dtype=torch.long, device=device)
 
     return input_tokens, target_tokens
-
-
-def run_get_batch(x, batch_size, context_length, device):
-    """Test adapter entry point required by pytest test_get_batch"""
-    return get_batch(x, batch_size, context_length, device)
