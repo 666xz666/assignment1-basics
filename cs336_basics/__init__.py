@@ -17,6 +17,7 @@ from .nn import (
 )
 from .optim import SGD, AdamW, get_lr_cosine_schedule, CosineAnnealingWarmupLR
 from .utils import cross_entropy, gradient_clipping, get_batch
+from .serialization import save_checkpoint, load_checkpoint
 
 try:
     __version__ = importlib.metadata.version("cs336_basics")
@@ -46,4 +47,6 @@ __all__ = [
     "CosineAnnealingWarmupLR",
     "gradient_clipping",
     "get_batch",
+    "save_checkpoint",
+    "load_checkpoint",
 ]
