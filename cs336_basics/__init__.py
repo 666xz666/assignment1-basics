@@ -16,7 +16,7 @@ from .nn import (
     TransformerBlock,
 )
 from .optim import SGD, AdamW, get_lr_cosine_schedule, CosineAnnealingWarmupLR
-from .utils import cross_entropy, gradient_clipping
+from .utils import cross_entropy, gradient_clipping, get_batch
 
 try:
     __version__ = importlib.metadata.version("cs336_basics")
@@ -45,4 +45,5 @@ __all__ = [
     "get_lr_cosine_schedule",
     "CosineAnnealingWarmupLR",
     "gradient_clipping",
+    "get_batch",
 ]
