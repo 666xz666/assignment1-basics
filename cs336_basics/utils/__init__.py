@@ -3,6 +3,7 @@ from .loss import cross_entropy
 from .gradient_clipping import gradient_clipping
 from .data import get_batch, create_memmap_corpus, load_mmap_corpus
 from .logger import setup_logger
+from .decoding import decode
 
 __all__ = [
     "try_gpu",
@@ -12,4 +13,5 @@ __all__ = [
     "create_memmap_corpus",
     "load_mmap_corpus",
     "setup_logger",
+    "decode",
 ]
