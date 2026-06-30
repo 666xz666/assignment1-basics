@@ -97,6 +97,8 @@ def main(args):
         project="assignment1-basic",
         name=args.run_name,
         config=args,  # 将全部配置录入wandb便于回溯实验
+        dir="./output/wandb",
+        mode="offline",
     )
 
     # ====================== 训练主循环 ======================
@@ -120,8 +122,9 @@ def main(args):
         # 参数更新
         optimizer.step()
 
+        it_log = it + 1
         # ---------------- 每隔固定步数验证+日志打印 ----------------
-        if it % 100 == 0 or it == args.max_iters - 1:
+        if it_log % 100 == 0 or it_log == args.max_iters:
             model.eval()
             with torch.no_grad():
                 # 验证集前向，不计算梯度节省显存
@@ -136,7 +139,7 @@ def main(args):
 
                 # 替换原print，使用规范日志输出
                 logger.info(
-                    f"Iter {it:6d} | train_loss={loss.item():.4f} | val_loss={v_loss.item():.4f} "
+                    f"Iter {it_log:6d} | train_loss={loss.item():.4f} | val_loss={v_loss.item():.4f} "
                     f"| lr={current_lr:.6e} | elapsed={elapsed_total_sec:.2f}s"
                 )
 
@@ -146,14 +149,14 @@ def main(args):
                         "train/loss": loss.item(),
                         "val/loss": v_loss.item(),
                         "lr": current_lr,
-                        "iter": it + 1,  # iter记录为已完成总步数，和循环序号做区分
+                        "iter": it_log,  # iter记录为已完成总步数，和循环序号做区分
                         "wall_time_seconds": elapsed_total_sec,
                     }
                 )
 
         # ---------------- 定期保存中间检查点 ----------------
-        if it % 1000 == 0 and it > 0:
-            ckpt_save_path = os.path.join(args.out_dir, f"ckpt_it{it + 1}.pt")
+        if (it_log) % 1000 == 0:
+            ckpt_save_path = os.path.join(args.out_dir, f"ckpt_it{it_log}.pt")
             save_checkpoint(model, optimizer, it, ckpt_save_path)
             logger.info(f"Saved intermediate checkpoint: {ckpt_save_path}")
 
