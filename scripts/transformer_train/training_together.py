@@ -168,9 +168,9 @@ def main(args, raw_cfg_dict: dict, cfg_path: str):
                         "train/loss": loss.item(),
                         "val/loss": v_loss.item(),
                         "lr": current_lr,
-                        "iter": it_log,
                         "wall_time_seconds": elapsed_total_sec,
-                    }
+                    },
+                    step=it_log,  # 关键：强制内置_step = 你的迭代序号it_log
                 )
 
         # 每1000步保存，规避续训开局重复覆盖ckpt
