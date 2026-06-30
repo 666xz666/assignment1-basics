@@ -1,6 +1,8 @@
 import os
 import typing
+import io
 import torch
+from tqdm import tqdm
 from torch import nn, optim
 
 
@@ -9,9 +11,10 @@ def save_checkpoint(
     optimizer: optim.Optimizer,
     iteration: int,
     out: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
+    chunk_size: int = 10 * 1024 * 1024,  # 分片大小：默认10MB每块
 ) -> None:
     r"""
-    保存包含模型权重、优化器状态和当前迭代步骤的训练检查点。
+    保存包含模型权重、优化器状态和当前迭代步骤的训练检查点，附带写入进度条。
     将所有状态打包到一个字典容器中，然后通过torch序列化。保存到指定路径。
 
     Stored contents overview:
@@ -31,6 +34,7 @@ def save_checkpoint(
         optimizer: Optimizer instance (e.g. AdamW) to preserve momentum/learning rate scheduling state
         iteration: Integer training step counter to record progress
         out: Target output, can be file path string, path-like object, or binary file stream object
+        chunk_size: Chunk byte size for segmented writing when displaying progress bar, default 10MB
 
     Returns:
         None
@@ -40,7 +44,41 @@ def save_checkpoint(
         "optimizer_state_dict": optimizer.state_dict(),
         "iteration": iteration,
     }
-    torch.save(checkpoint, out)
+
+    # 1. 先序列化整个checkpoint到内存字节缓冲区
+    buf = io.BytesIO()
+    torch.save(checkpoint, buf)
+    buf.seek(0)
+    total_bytes = buf.getbuffer().nbytes
+
+    # 2. 判断输出是文件路径还是已打开的文件流
+    if isinstance(out, (str, os.PathLike)):
+        file_handle = open(out, "wb")
+        auto_close = True
+        desc = f"Saving {os.path.basename(str(out))}"
+    else:
+        file_handle = out
+        auto_close = False
+        desc = "Saving checkpoint stream"
+
+    # 3. 分块写入 + tqdm 进度条
+    pbar = tqdm(
+        total=total_bytes,
+        unit="B",
+        unit_scale=True,
+        unit_divisor=1024,
+        desc=desc,
+        leave=True,
+    )
+    while chunk := buf.read(chunk_size):
+        file_handle.write(chunk)
+        pbar.update(len(chunk))
+    pbar.close()
+
+    # 资源收尾
+    buf.close()
+    if auto_close:
+        file_handle.close()
 
 
 def load_checkpoint(

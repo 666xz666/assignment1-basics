@@ -1,0 +1,35 @@
+{
+  "run_name": "transformer_baseline_run1",
+  "out_dir": "./checkpoints",
+
+  "train_data_path": "./train.bin",
+  "valid_data_path": "./val.bin",
+
+  "vocab_size": 32000,
+  "context_length": 512,
+  "d_model": 512,
+  "num_heads": 8,
+  "d_ff": 2048,
+  "num_layers": 6,
+  "param_dtype": "float32",
+  "theta": 10000.0,
+
+  "batch_size": 32,
+  "max_iters": 100000,
+
+  "alpha_max": 0.001,
+  "alpha_min": 1e-5,
+  "beta1": 0.9,
+  "beta2": 0.999,
+  "adam_eps": 1e-8,
+  "weight_decay": 0.01,
+
+  "warmup_steps": 1000,
+  "total_anneal_steps": 100000,
+
+  "max_l2_norm": 1.0,
+  "eps": 1e-8,
+
+  "resume": false,
+  "ckpt_path": "./checkpoints/ckpt_it10000.pt"
+}

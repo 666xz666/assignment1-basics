@@ -16,7 +16,13 @@ from .nn import (
     TransformerBlock,
 )
 from .optim import SGD, AdamW, get_lr_cosine_schedule, CosineAnnealingWarmupLR
-from .utils import cross_entropy, gradient_clipping, get_batch
+from .utils import (
+    cross_entropy,
+    gradient_clipping,
+    get_batch,
+    create_memmap_corpus,
+    load_mmap_corpus,
+)
 from .serialization import save_checkpoint, load_checkpoint
 
 try:
@@ -47,6 +53,8 @@ __all__ = [
     "CosineAnnealingWarmupLR",
     "gradient_clipping",
     "get_batch",
+    "load_mmap_corpus",
+    "create_memmap_corpus",
     "save_checkpoint",
     "load_checkpoint",
 ]

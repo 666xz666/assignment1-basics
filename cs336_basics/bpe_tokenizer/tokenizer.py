@@ -88,9 +88,9 @@ class BPETokenizer:
                 yield tid
 
 
-def load_bpe_tokenizer(out_dir: str, special_tokens: list[str]) -> BPETokenizer:
-    vocab_path = Path(out_dir) / "vocab.json"
-    merges_path = Path(out_dir) / "merges.txt"
+def load_bpe_tokenizer(config_dir: str, special_tokens: list[str]) -> BPETokenizer:
+    vocab_path = Path(config_dir) / "vocab.json"
+    merges_path = Path(config_dir) / "merges.txt"
 
     with open(vocab_path, "r", encoding="utf-8") as f:
         vocab_raw = json.load(f)

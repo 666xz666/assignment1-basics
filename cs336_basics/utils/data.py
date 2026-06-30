@@ -44,3 +44,48 @@ def get_batch(
     target_tokens = torch.tensor(np.stack(target_list), dtype=torch.long, device=device)
 
     return input_tokens, target_tokens
+
+
+def load_mmap_corpus(file_path: str, dtype=np.int64) -> np.memmap:
+    """只读打开超大语料，极低内存占用
+
+    Args:
+        file_path: str，.mmap文件路径
+        dtype: np数据类型
+    """
+    mm = np.memmap(
+        filename=file_path,
+        dtype=dtype,
+        mode="r",  # 只读，安全、节省开销
+        shape=None,  # 自动从文件推断长度
+    )
+    return mm
+
+
+def create_memmap_corpus(
+    output_path: str, total_tokens: int, dtype=np.int64
+) -> np.memmap:
+    """创建空的磁盘映射数组，后续填充全局token ID序列
+
+    Example：
+        假设你已经得到一维全部token id:
+        raw_tokens: np.ndarray = np.concatenate(...)
+        total_len = len(raw_tokens)
+
+        mm_corpus = create_memmap_corpus("corpus.mmap", total_len)
+        mm_corpus[:] = raw_tokens[:]  # 写入全部数据到磁盘
+        mm_corpus.flush()             # 强制刷盘，防止缓存丢失
+        del mm_corpus                 # 关闭映射
+    
+    Args:
+        output_path: str，.mmap文件保存路径
+        total_tokens: int， 一维数组长度
+        dtype: np数据类型
+    """
+    mm = np.memmap(
+        filename=output_path,
+        dtype=dtype,
+        mode="w+",  # 读写创建模式
+        shape=(total_tokens,),
+    )
+    return mm
