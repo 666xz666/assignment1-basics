@@ -63,6 +63,9 @@ class TransformerLM(nn.Module):
         """
         super().__init__()
 
+        # 模型预设的最长上下文
+        self.context_length = context_length
+
         # Token Embedding 层
         self.emb = Embedding(vocab_size, d_model, device, dtype)
 
@@ -94,11 +97,11 @@ class TransformerLM(nn.Module):
 
         Args:
             token_ids: torch.Tensor
-                输入 token 序号张量，形状 $(\dots,\ \text{seq_len})$，取值范围 $[0,\ vocab\_size-1]$
+                输入 token 序号张量，形状 $(\dots,\ \text{seq\_len})$，取值范围 $[0,\ vocab\_size-1]$
 
         Returns:
             torch.Tensor
-                输出词汇 logits，形状 $(\dots,\ \text{seq_len},\ \text{vocab_size})$，
+                输出词汇 logits，形状 $(\dots,\ \text{seq\_len},\ \text{vocab\_size})$，
                 对应每个位置下所有词表 token 的原始得分
         """
         # Embedding
