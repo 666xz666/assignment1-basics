@@ -14,31 +14,28 @@ def decode(
     eos_token_id: int,
 ) -> torch.Tensor:
     r"""
-    自回归解码函数，实现带温度缩放的Top-p（核采样）生成，满足本次解码作业全部要求
+    自回归解码函数，修复Top-p逻辑BUG，带全局缓存保证Prompt永不丢失
 
-    ## 数学公式说明
-    ### 1. 温度缩放 Temperature Scaling
-    设预测下一个token原始logits为 $\{v_i\}$：
-    $$
-    z_i = \frac{v_i}{T},\quad
-    P(x_{t+1}=i\mid x_{1\dots t})
-    = \frac{\exp(z_i)}{\sum_j \exp(z_j)}
-    $$
-    式中 $T=\texttt{temperature}$。
-    $T>1$ 分布更平缓，生成随机性更强；$0<T<1$ 分布更尖锐，偏向高概率词，生成更确定。
+    ## 核心原理
+    基于自回归方式逐token生成文本，每一步利用上文预测下一个词；
+    采用温度缩放调节分布尖锐程度，搭配Top-p核采样控制随机选词范围；
+    设计双序列缓存机制，避免上下文窗口截断丢失原始输入Prompt。
 
-    ### 2. Top-p 核采样 Nucleus Sampling (Holtzman et al., 2020)
-    将概率从大到小排序 $p_1\ge p_2\ge\dots\ge p_V$，找到最小下标 $k$ 满足累积概率阈值：
-    $$
-    \sum_{i=1}^k p_i \ge \texttt{top\_p}
-    $$
-    将下标 $k$ 之后所有token概率置为 $-\infty$，重新归一化概率分布，仅在候选集合内采样下一个token。
+    ### 1. 温度缩放
+    对最后位置输出logits做缩放，调节预测分布平滑程度：
 
-    ### 生成终止逻辑
-    循环迭代采样 $x_{t+1}$ 拼接到序列末尾，满足任一条件停止：
-    1. 采样出的token等于终止符 eos_token_id (<|endoftext|>)
-    2. 已生成 max_new_tokens 个新词
-    每次前向前自动截断输入长度不超过模型 context_length，防止RoPE位置索引越界报错
+    $$z_i = \frac{\text{logit}_i}{T}$$
+
+    $T$为temperature，$T\to0$分布尖锐偏向高概率词，$T>1$分布更平缓随机性更强。
+
+    ### 2. Top-p 核采样
+    将概率从大到小排序，累加概率首次超过阈值$p$，截断后续低概率token，仅在候选集合内重归一化采样：
+
+    $$\sum_{i=1}^k p_i \ge \text{top\_p}$$
+
+    ### 终止条件
+    1. 采样得到EOS结束符，提前终止生成
+    2. 生成token数量达到max_new_tokens上限，停止迭代
 
     Args:
         model: TransformerLM
@@ -63,50 +60,57 @@ def decode(
     assert 0.0 < top_p <= 1.0, "top-p阈值需要在(0, 1]区间内"
     # 获取模型预设最大上下文窗口长度
     ctx_len = model.context_length
-    # 拷贝初始prompt，避免修改外部传入张量
+
+    # 全局缓存：完整保存全部序列，最终返回使用，永远不会因窗口截断丢失开头Prompt
+    full_tokens = prompt_ids.clone()
+    # 局部窗口序列：仅送入模型做前向推理，长度严格受限上下文上限，防止位置编码越界
     tokens = prompt_ids.clone()
 
     for _ in range(max_new_tokens):
-        # 如果当前序列总长度超出上下文上限，截断最前面多余token
+        # 若推理序列长度超限，只保留末尾ctx_len个token，全局完整序列不受影响
         if tokens.size(1) > ctx_len:
             tokens = tokens[:, -ctx_len:]
 
-        # 模型前向，输出完整序列每个位置logits [batch, seq_len, vocab_size]
+        # 模型前向传播，输出每个位置完整词表logits [batch, seq_len, vocab_size]
         logits = model(tokens)
-        # 仅取出最后一个位置的logits，用于预测下一个token
+        # 只取出序列最后一位logits，用于预测下一个token
         last_logits = logits[:, -1, :]
 
-        # 第一步：温度缩放处理
+        # 1. 温度缩放处理
         scaled_logits = last_logits / temperature
 
-        # 第二步：Top-p核采样逻辑
+        # 2. Top-p核采样流程
+        # 对logits做softmax转为概率分布
         probs = softmax(scaled_logits, dim=-1)
-        # 按概率从高到低排序，同时记录原词表下标
-        sorted_probs, sorted_indices = torch.sort(probs, descending=True, dim=-1)
-        # 计算排序后概率的累积和
-        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+        # 按概率从高到低排序，同时保存排序对应的原始词表下标
+        sorted_probs, sorted_idx = torch.sort(probs, descending=True, dim=-1)
+        # 计算排序后概率的累积和，用于判断截断位置
+        cum_p = torch.cumsum(sorted_probs, dim=-1)
 
-        # 标记累积概率超出top-p阈值的位置
-        mask = cumulative_probs > top_p
-        # 掩码右移一位：保证至少保留概率最大的一个token不会被屏蔽
-        mask[:, 1:] = mask[:, 1:] & mask[:, :-1]
+        # 标记累积概率超出top_p阈值的位置，这部分token需要屏蔽
+        mask = cum_p > top_p
+        # 强制保留概率最高的第一个token，避免全部被屏蔽后出现全-inf数值异常
+        mask[:, 0] = False
 
-        # 把超出阈值的候选token logits填充为负无穷
-        sorted_logits_masked = scaled_logits.scatter(
-            dim=-1, index=sorted_indices, src=scaled_logits
-        )
-        sorted_logits_masked[mask] = -float("inf")
+        # 根据排序下标，提取排序后对应的原始logits
+        sorted_logits = torch.gather(scaled_logits, dim=-1, index=sorted_idx)
+        # 超出核范围的token置负无穷，softmax后概率趋近0
+        sorted_logits[mask] = -float("inf")
 
-        # 重新归一化得到截断后的概率分布
-        final_probs = softmax(sorted_logits_masked, dim=-1)
-        # 多项式采样得到下一个token
-        next_token = torch.multinomial(final_probs, num_samples=1)
+        # 对筛选后的logits重新归一化，得到核内有效概率分布
+        final_probs = softmax(sorted_logits, dim=-1)
+        # 在核内多项式采样，得到排序空间内的下标
+        next_token_idx = torch.multinomial(final_probs, num_samples=1)
+        # 将排序空间下标映射回原始词表真实token编号
+        next_token = torch.gather(sorted_idx, dim=-1, index=next_token_idx)
 
-        # 将新token拼接到序列末尾
+        # 推理窗口追加新token，作为下一轮上文输入
         tokens = torch.cat([tokens, next_token], dim=1)
+        # 全局完整序列同步追加，保证最终输出包含全部历史
+        full_tokens = torch.cat([full_tokens, next_token], dim=1)
 
-        # 碰到结束符，提前跳出生成循环
-        if next_token.item() == eos_token_id:
+        # 单样本场景下，采样出结束符则提前跳出循环
+        if full_tokens.size(0) == 1 and next_token.item() == eos_token_id:
             break
 
-    return tokens
+    return full_tokens
