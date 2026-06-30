@@ -472,14 +472,9 @@ def run_transformer_lm(
 
     # 输入索引移至对应设备
     x_ids = in_indices.to(dv)
-    seq_len = x_ids.size(-1)
-
-    # 生成RoPE所需位置下标
-    pos_base = torch.arange(seq_len, device=dv, dtype=torch.long)
-    pos = pos_base.expand(*x_ids.shape[:-2], seq_len)
 
     # 模型前向推理
-    logits = lm(x_ids, pos)
+    logits = lm(x_ids)
     return logits
 
 

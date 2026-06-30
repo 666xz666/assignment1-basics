@@ -63,7 +63,7 @@ class RoPE(nn.Module):
         :param token_positions: torch.Tensor, 每个token对应的序列位置，形状为(..., seq_len)，前置维度需和x广播兼容
         :return: torch.Tensor, 经过RoPE旋转后的张量，形状与输入x完全一致
 
-        NOTE: 注意这里为什么还得单独给一个token_positions，因为x是截断文本，x上的位置不能严格对应其在原文本中的位置，token_positions应该是在数据预处理时顺便得到的
+        NOTE: 注意这里为什么不在方法里生成token_position，因为每一层TransformerBlock都要用，所以在TransformerLM中生成一次然后共享
         """
         # shape: (..., seq_len, d_k // 2)
         cos = self.cos_table[token_positions]

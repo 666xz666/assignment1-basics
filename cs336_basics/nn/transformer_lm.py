@@ -88,17 +88,13 @@ class TransformerLM(nn.Module):
         # LM 输出头：映射到词表维度
         self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
 
-    def forward(
-        self, token_ids: torch.Tensor, token_positions: torch.Tensor | None = None
-    ) -> torch.Tensor:
+    def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         r"""
         Transformer 语言模型前向推理，输出逐位置词汇 logits
 
         Args:
             token_ids: torch.Tensor
                 输入 token 序号张量，形状 $(\dots,\ \text{seq_len})$，取值范围 $[0,\ vocab\_size-1]$
-            token_positions: torch.Tensor | None
-                RoPE 使用的位置下标张量；关闭 RoPE 或内部自动生成时可传 None
 
         Returns:
             torch.Tensor
@@ -107,6 +103,13 @@ class TransformerLM(nn.Module):
         """
         # Embedding
         x = self.emb(token_ids)
+
+        # 生成token_positions
+        seq_len = token_ids.size(-1)
+        # 形状就是(seq_len)后续利用广播机制展开计算
+        token_positions = torch.arange(
+            0, seq_len, device=token_ids.device, dtype=torch.long
+        )
 
         # Transformer Blocks
         for layer in self.layers:
