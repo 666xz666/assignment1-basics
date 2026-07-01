@@ -1,21 +1,56 @@
 import os
 import json
 
-def byte_list_to_str(byte_nums: list[int]) -> str:
-    """字节数值列表 → GPT2 可视字符串，空格替换为 Ġ"""
-    raw_bytes = bytes(byte_nums)
-    try:
-        s = raw_bytes.decode("utf-8")
-        return s.replace(" ", "Ġ")
-    except UnicodeDecodeError:
-        # 无法解码就保留原始字节字面量
-        return repr(raw_bytes)
+
+# def byte_list_to_str(byte_nums: list[int]) -> str:
+#     """字节数值列表 → GPT2 可视字符串，空格替换为 Ġ"""
+#     raw_bytes = bytes(byte_nums)
+#     try:
+#         s = raw_bytes.decode("utf-8")
+#         return s.replace(" ", "Ġ")
+#     except UnicodeDecodeError:
+#         # 无法解码就保留原始字节字面量
+#         return repr(raw_bytes)
+
+
+from functools import lru_cache
+
+
+@lru_cache()
+def bytes_to_unicode():
+    bs = (
+        list(range(ord("!"), ord("~") + 1))
+        + list(range(ord("¡"), ord("¬") + 1))
+        + list(range(ord("®"), ord("ÿ") + 1))
+    )
+    cs = bs[:]
+    n = 0
+    for b in range(256):
+        if b not in bs:
+            bs.append(b)
+            cs.append(256 + n)
+            n += 1
+    cs = [chr(n) for n in cs]
+    return dict(zip(bs, cs))
+
+
+byte2char = bytes_to_unicode()
+
+
+# 转换逻辑
+def byte_list_to_str(blist: list[int]) -> str:
+    raw_b = bytes(blist)
+    chars = [byte2char[b] for b in raw_b]
+    s = "".join(chars)
+    # 仅全局空格替换为Ġ，映射后的字符内部无原生换行、无原生空格
+    return s.replace(" ", "Ġ")
+
 
 def convert_vocab_and_merges(
     vocab_in_path: str,
     merges_num_in_path: str,
     vocab_out_path: str,
-    merges_out_path: str
+    merges_out_path: str,
 ):
     # ========== 1、读取原始词表 id -> 字节列表 ==========
     with open(vocab_in_path, "r", encoding="utf-8") as f:
@@ -43,14 +78,35 @@ def convert_vocab_and_merges(
             part1, part2 = line.split()
             nums1 = list(map(int, part1.split(",")))
             nums2 = list(map(int, part2.split(",")))
+            if len(nums1) < 1 or len(nums2) < 1:
+                print("len(nums1) < 1 or len(nums2) < 1")
             merge_pairs.append((nums1, nums2))
 
     with open(merges_out_path, "w", encoding="utf-8") as f:
-        for b_list1, b_list2 in merge_pairs:
+        empty_count = 0
+        total_written = 0
+        for idx, (b_list1, b_list2) in enumerate(merge_pairs, start=1):
             s1 = byte_list_to_str(b_list1)
             s2 = byte_list_to_str(b_list2)
+
+            # 检测空串
+            if not s1 or not s2:
+                empty_count += 1
+                print(
+                    f"[警告 第{idx}对] s1='{repr(s1)}' s2='{repr(s2)}' 存在空字符串，跳过本条merge"
+                )
+                continue
+
             f.write(f"{s1} {s2}\n")
+            total_written += 1
+
+        print(f"\nmerge写入统计：")
+        print(f"总待处理合并对数: {len(merge_pairs)}")
+        print(f"因空串跳过数量: {empty_count}")
+        print(f"成功写入有效合并对数: {total_written}")
+    print(f"[Done] GPT2格式merges已写出，有效合并对数：{total_written}")
     print(f"[Done] GPT2格式merges已写出：{merges_out_path}")
+
 
 if __name__ == "__main__":
     # 路径配置（和你训练输出目录对齐）
@@ -72,6 +128,6 @@ if __name__ == "__main__":
         vocab_in_path=vocab_input,
         merges_num_in_path=merges_num_input,
         vocab_out_path=vocab_gpt2_output,
-        merges_out_path=merges_gpt2_output
+        merges_out_path=merges_gpt2_output,
     )
     print("\n全部转换完成！")
