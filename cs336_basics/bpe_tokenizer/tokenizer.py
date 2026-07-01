@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Iterator, Iterable, List, Tuple
 from pathlib import Path
 import json
+from functools import lru_cache
 
 from cs336_basics.bpe_tokenizer.utils import pre_tokenize
 
@@ -111,3 +112,75 @@ def load_bpe_tokenizer(config_dir: str, special_tokens: list[str]) -> BPETokeniz
             merges.append((b1, b2))
 
     return BPETokenizer(vocab, merges, special_tokens=special_tokens)
+
+
+@lru_cache(maxsize=None)
+def bytes_to_unicode():
+    bs = (
+        list(range(ord("!"), ord("~") + 1))
+        + list(range(ord("¡"), ord("¬") + 1))
+        + list(range(ord("®"), ord("ÿ") + 1))
+    )
+    cs = bs[:]
+    n = 0
+    for b in range(256):
+        if b not in bs:
+            bs.append(b)
+            cs.append(256 + n)
+            n += 1
+    cs = [chr(n) for n in cs]
+    return dict(zip(bs, cs))
+
+
+byte2char = bytes_to_unicode()
+char2byte = {v: k for k, v in byte2char.items()}
+
+
+def gpt2_str_to_bytes(token_str: str) -> bytes:
+    out = []
+    for c in token_str:
+        if c == "Ġ":
+            # Ġ 专门还原为空格字节 32
+            out.append(32)
+        else:
+            out.append(char2byte[c])
+    return bytes(out)
+
+
+def load_bpe_tokenizer_gpt2(config_dir: str, special_tokens: list[str]) -> BPETokenizer:
+    vocab_path = Path(config_dir) / "vocab_gpt2.json"
+    merges_path = Path(config_dir) / "merges_gpt2.txt"
+
+    # 1. 读取 GPT2 标准词表 {token_str: id}，反向构造 id -> bytes
+    with open(vocab_path, "r", encoding="utf-8") as f:
+        str_to_id = json.load(f)
+
+    vocab: dict[int, bytes] = {}
+    for token_str, sid_str in str_to_id.items():
+        sid = int(sid_str)
+        vocab[sid] = gpt2_str_to_bytes(token_str)
+
+    # 2. 读取 GPT2 merges.txt，每行两个 token 字符串，不再 split(",")
+    merges: List[Tuple[bytes, bytes]] = []
+    with open(merges_path, "r", encoding="utf-8") as f:
+        for line_idx, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) != 2:
+                print(f"[加载警告] 跳过第{line_idx}行格式异常: {repr(line)}")
+                continue
+            part1, part2 = parts
+            b1 = gpt2_str_to_bytes(part1)
+            b2 = gpt2_str_to_bytes(part2)
+            merges.append((b1, b2))
+
+    tokenizer = BPETokenizer(vocab, merges, special_tokens=special_tokens)
+
+    # 自动绑定 eos_id
+    eos_str = "<|endoftext|>"
+    if eos_str in special_tokens:
+        tokenizer.eos_id = tokenizer.encode(eos_str)[0]
+
+    return tokenizer
