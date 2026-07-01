@@ -16,6 +16,7 @@ def decode(
     r"""
     自回归解码函数，修复Top-p逻辑BUG，带全局缓存保证Prompt永不丢失
 
+    https://www.bilibili.com/video/BV1taSFBNEG4/
     ## 核心原理
     基于自回归方式逐token生成文本，每一步利用上文预测下一个词；
     采用温度缩放调节分布尖锐程度，搭配Top-p核采样控制随机选词范围；
