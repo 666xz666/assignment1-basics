@@ -14,7 +14,7 @@ warnings.filterwarnings(
 from cs336_basics.nn import TransformerLM
 from cs336_basics.serialization import load_checkpoint
 from cs336_basics.utils import try_gpu, decode
-from cs336_basics.bpe_tokenizer import load_bpe_tokenizer
+from cs336_basics.bpe_tokenizer import load_bpe_tokenizer, load_bpe_tokenizer_gpt2
 
 
 def main():
@@ -79,7 +79,7 @@ def main():
     # 3. 初始化分词器
     with open(args.tokenizer_dir, "r", encoding="utf-8") as f:
         tok_cfg = json.load(f)
-    tokenizer = load_bpe_tokenizer(
+    tokenizer = load_bpe_tokenizer_gpt2(
         tok_cfg["tokenizer_root_dir"], tok_cfg["special_tokens"]
     )
     eos_token_id = tokenizer.encode("<|endoftext|>")[0]
