@@ -151,8 +151,8 @@ def build_corpus_mmap(
 
 
 def main():
-    txt_file = "./data/TinyStoriesV2-GPT4-train.txt"
-    tok_cfg_path = "./data/config/tiny_example/tokenizer_config.json"
+    txt_file = "./data/owt_valid.txt"
+    tok_cfg_path = "./data/config/owt_example/tokenizer_config.json"
 
     # Ubuntu 直接启用多进程，可手动指定进程数，如 num_proc=6
     build_corpus_mmap_multi_proc(txt_file, tok_cfg_path, num_proc=4)
