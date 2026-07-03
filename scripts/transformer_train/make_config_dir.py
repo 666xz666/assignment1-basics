@@ -2,7 +2,7 @@ import json
 import os
 
 # 配置字典
-run_name = "tiny_lr1e-4_step7000"
+run_name = "tiny_lr_1e-4_batch_64_step_7000"
 config = {
     # 名称与路径
     "run_name": f"train_{run_name}",
