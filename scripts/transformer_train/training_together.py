@@ -34,6 +34,9 @@ def main(args, raw_cfg_dict: dict, cfg_path: str):
     :param raw_cfg_dict: 原始字典，用于回写 run_id
     :param cfg_path: 配置文件路径，用于修改保存 run_id
     """
+    # 开启A100专属的TF32精度加速，速度能提10~20%，对精度几乎无影响，也不会额外占显存
+    torch.set_float32_matmul_precision('high')
+
     # 初始化日志
     logger = setup_logger(args.out_dir)
     train_start_time = time.time()
@@ -79,7 +82,7 @@ def main(args, raw_cfg_dict: dict, cfg_path: str):
     scheduler = CosineAnnealingWarmupLR(
         optimizer=optimizer,
         alpha_max=args.alpha_max,
-        alpha_min=args.alpha_min,
+        alpha_min=args.alpha_max * 0.1, #  设置最小学习率始终是最大学习率的10%
         T_w=args.warmup_steps,
         T_c=args.total_anneal_steps,
     )
