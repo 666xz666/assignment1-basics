@@ -25,7 +25,7 @@ config = {
     "warmup_steps": 700,
     "total_anneal_steps": 7000,
     # 学习率
-    "alpha_max": 3e-4,
+    "alpha_max": 1e-4,
     "beta1": 0.9,
     "beta2": 0.999,
     "adam_eps": 1e-08,
