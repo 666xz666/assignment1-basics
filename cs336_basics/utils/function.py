@@ -23,8 +23,11 @@ def softmax(x: torch.Tensor, dim: int = -1):
     # keepdim=False 时: (..., 1, ...)
     # .values返回张量结果
     # .indices返回下标
+    in_dtype = x.dtype
+    x = x.to(torch.float32)
     max_val = x.max(dim=dim, keepdim=True).values
     y = x - max_val
     exp = torch.exp(y)
     exp_sum = exp.sum(dim=dim, keepdim=True)
-    return exp / exp_sum
+    res = exp / exp_sum
+    return res.to(in_dtype)

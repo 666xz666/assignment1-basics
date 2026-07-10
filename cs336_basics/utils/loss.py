@@ -5,8 +5,7 @@ from jaxtyping import Float, Int
 
 
 def cross_entropy(
-    logits: Float[Tensor, "*batch vocab_size"],
-    target: Int[Tensor, "*batch"]
+    logits: Float[Tensor, "*batch vocab_size"], target: Int[Tensor, "*batch"]
 ) -> Float[Tensor, ""]:
     r"""
     根据模型原始输出 logits $o_i$ 与目标 token 索引 $x_{i+1}$，计算平均交叉熵（负对数似然）损失。
@@ -49,6 +48,8 @@ def cross_entropy(
         Float[Tensor, ""]
             标量张量，所有批量位置交叉熵损失的平均值
     """
+    logits.to(torch.float32)
+
     # 每行最大值移位，和softmax稳定逻辑一致
     max_vals = logits.max(dim=-1, keepdim=True).values
     shifted_logits = logits - max_vals

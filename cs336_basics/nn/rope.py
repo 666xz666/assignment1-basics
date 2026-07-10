@@ -65,6 +65,9 @@ class RoPE(nn.Module):
 
         NOTE: 注意这里为什么不在方法里生成token_position，因为每一层TransformerBlock都要用，所以在TransformerLM中生成一次然后共享
         """
+        in_dtype = x.dtype
+        x = x.to(torch.float32)
+
         # shape: (..., seq_len, d_k // 2)
         cos = self.cos_table[token_positions]
         sin = self.sin_table[token_positions]
@@ -83,4 +86,4 @@ class RoPE(nn.Module):
         x_rot = torch.stack([x_rot0, x_rot1], dim=0)
         x_out = einops.rearrange(x_rot, "two ... half_d_k -> ... (half_d_k two)")
 
-        return x_out
+        return x_out.to(in_dtype)
