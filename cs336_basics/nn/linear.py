@@ -19,6 +19,11 @@ class Linear(nn.Module):
         nn.init.trunc_normal_(weight, 0, sigma, -3 * sigma, 3 * sigma)
         self.W = nn.Parameter(weight)
 
+    @property
+    def weight(self) -> nn.Parameter:
+        """Compatibility alias for APIs expecting PyTorch's Linear.weight."""
+        return self.W
+
     def _set_w(self, w: torch.Tensor):
         """[TEST]set W for test"""
         self.W = nn.Parameter(w)
